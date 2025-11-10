@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="h-full bg-gray-50">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>أومني بوس - نقطة بيع متكاملة</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              DEFAULT: 'rgb(var(--color-primary) / <alpha-value>)',
+              dark: 'rgb(var(--color-primary-dark) / <alpha-value>)',
+            },
+            secondary: '#F3F4F6',
+          },
+          animation: {
+            'fade-in': 'fade-in 0.2s ease-out',
+            'zoom-in-95': 'zoom-in-95 0.2s ease-out',
+            'slide-in-from-top-2': 'slide-in-from-top-2 0.2s ease-out',
+          },
+          keyframes: {
+            'fade-in': { from: { opacity: 0 }, to: { opacity: 1 } },
+            'zoom-in-95': { from: { opacity: 0, transform: 'scale(0.95)' }, to: { opacity: 1, transform: 'scale(1)' } },
+            'slide-in-from-top-2': { from: { opacity: 0, transform: 'translateY(-0.5rem)' }, to: { opacity: 1, transform: 'translateY(0)' } }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --color-primary: 79 70 229;
+      --color-primary-dark: 67 56 202;
+    }
+    .num-l {
+        direction: ltr !important;
+        unicode-bidi: isolate !important;
+        font-variant-numeric: tabular-nums;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+    }
+    @media print {
+      body * { visibility: hidden; }
+      #root { display: none; }
+      .printable, .printable * { visibility: visible !important; }
+      .printable {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100% !important;
+        max-width: 80mm !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: white !important;
+        color: black !important;
+        display: block !important;
+      }
+      .printable.loyalty-card {
+          position: fixed;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          max-width: none !important;
+          width: auto !important;
+      }
+      .printable.loyalty-card.color-mode {
+         -webkit-print-color-adjust: exact !important;
+         print-color-adjust: exact !important;
+      }
+      .no-print { display: none !important; }
+    }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.553.0",
+    "dexie": "https://aistudiocdn.com/dexie@^4.2.1",
+    "dexie-react-hooks": "https://aistudiocdn.com/dexie-react-hooks@^4.2.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.3.0",
+    "dexie-export-import": "https://aistudiocdn.com/dexie-export-import@^4.1.4",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.5",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "html-to-image": "https://esm.sh/html-to-image@1.11.11"
+  }
+}
+</script>
+</head>
+<body class="h-full overflow-hidden font-sans text-gray-900 bg-gray-100">
+  <div id="root" class="h-full"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

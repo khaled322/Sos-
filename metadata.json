@@ -1,0 +1,5 @@
+{
+  "name": "Test OmniPOS with sheet",
+  "description": "A free, completely offline-capable Point of Sale system for managing products, sales, customers, and inventory directly in the browser. Features local data storage and manual synchronization capabilities.",
+  "requestFramePermissions": []
+}
