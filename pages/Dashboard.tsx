@@ -111,7 +111,20 @@ export default function Dashboard() {
                    <MiniStatCard title="ديون لنا" value={debts.c} icon={ArrowDownLeft} color="text-emerald-700" bg="bg-emerald-50" currency={currency} />
                    <MiniStatCard title="ديون علينا" value={debts.s} icon={ArrowUpRight} color="text-red-700" bg="bg-red-50" currency={currency} />
               </div>
-              <div className="bg-white p-6 rounded-3xl shadow-sm border flex-1"><h3 className="font-bold mb-4 flex items-center gap-2"><TrendingUp size={20} className="text-amber-500"/> الأكثر مبيعاً</h3><div className="space-y-3">{topProducts?.length > 0 ? topProducts.map((p, i) => (<div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl"><div className="flex items-center gap-3"><span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i===0?'bg-amber-100 text-amber-700':'bg-gray-200 text-gray-600'}`}>{i+1}</span><span className="truncate max-w-[140px] font-bold text-gray-800">{p.name}</span></div><span className="font-black num-l bg-white px-3 py-1 rounded-lg text-sm shadow-sm">{p.qty}</span></div>)) : <div className="text-center text-gray-400 py-8">لا توجد بيانات</div>}</div>
+              <div className="bg-white p-6 rounded-3xl shadow-sm border flex-1">
+                  <h3 className="font-bold mb-4 flex items-center gap-2"><TrendingUp size={20} className="text-amber-500"/> الأكثر مبيعاً</h3>
+                  <div className="space-y-3">
+                      {topProducts?.length > 0 ? topProducts.map((p, i) => (
+                          <div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl">
+                              <div className="flex items-center gap-3">
+                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i===0?'bg-amber-100 text-amber-700':'bg-gray-200 text-gray-600'}`}>{i+1}</span>
+                                  <span className="truncate max-w-[140px] font-bold text-gray-800">{p.name}</span>
+                              </div>
+                              <span className="font-black num-l bg-white px-3 py-1 rounded-lg text-sm shadow-sm">{p.qty}</span>
+                          </div>
+                      )) : <div className="text-center text-gray-400 py-8">لا توجد بيانات</div>}
+                  </div>
+              </div>
           </div>
       </div>
       {expModal && <ExpenseModal onClose={()=>setExpModal(false)} currency={currency}/>}
