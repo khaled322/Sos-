@@ -14,31 +14,36 @@ export default function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<{t:'success'|'error',tx:string}|null>(null);
   const settings = useLiveQuery(() => db.settings.toArray())?.[0];
-  const [fd, setFd] = useState({ storeName: '', storeAddress: '', storePhone: '', receiptFooter: '', currency: '', themeColor: 'indigo', posShowImages: true, posShowStock: true, loyaltyEnabled: false, spendPerPoint: 100, pointValue: 10, minPointsToRedeem: 50, liveSyncEnabled: false });
+  const [fd, setFd] = useState({ storeName: '', storeAddress: '', storePhone: '', receiptFooter: '', currency: '', themeColor: 'indigo', posShowImages: true, posShowStock: true, loyaltyEnabled: false, spendPerPoint: 100, pointValue: 10, minPointsToRedeem: 50, liveSyncEnabled: false, cloudApiUrl: '' });
 
   // Cloud Sync State
-  const [apiUrl, setApiUrl] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'testing' | 'ok' | 'error'>('unknown');
-  const [connectionError, setConnectionError] = useState('');
   const [isSyncing, setIsSyncing] = useState<'push' | 'pull' | null>(null);
   const [pullConfirm, setPullConfirm] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [isCloudConfigured, setIsCloudConfigured] = useState(false);
+  const isCloudConfigured = !!settings?.cloudApiUrl;
 
-  useEffect(() => { if (settings) setFd({ storeName: settings.storeName||'', storeAddress: settings.storeAddress||'', storePhone: settings.storePhone||'', receiptFooter: settings.receiptFooter||'شكراً لزيارتكم!', currency: settings.currency, themeColor: settings.themeColor||'indigo', posShowImages: settings.posShowImages??true, posShowStock: settings.posShowStock??true, loyaltyEnabled: settings.loyaltyEnabled??false, spendPerPoint: settings.spendPerPoint??100, pointValue: settings.pointValue??10, minPointsToRedeem: settings.minPointsToRedeem??50, liveSyncEnabled: settings.liveSyncEnabled??false }); }, [settings]);
-  
-  // Effect to load initial cloud URL
-  useEffect(() => {
-    const savedUrl = localStorage.getItem('cloudflare_api_url');
-    const defaultUrl = 'https://super-thunder-bdfe.khaledbcf19.workers.dev';
-    setApiUrl(savedUrl || defaultUrl);
-
-    if (savedUrl) {
-        setIsCloudConfigured(true);
-        setConnectionStatus('unknown'); // User must re-test to confirm it's still valid
+  useEffect(() => { 
+    if (settings) {
+        setFd({ 
+            storeName: settings.storeName||'', 
+            storeAddress: settings.storeAddress||'', 
+            storePhone: settings.storePhone||'', 
+            receiptFooter: settings.receiptFooter||'شكراً لزيارتكم!', 
+            currency: settings.currency, 
+            themeColor: settings.themeColor||'indigo', 
+            posShowImages: settings.posShowImages??true, 
+            posShowStock: settings.posShowStock??true, 
+            loyaltyEnabled: settings.loyaltyEnabled??false, 
+            spendPerPoint: settings.spendPerPoint??100, 
+            pointValue: settings.pointValue??10, 
+            minPointsToRedeem: settings.minPointsToRedeem??50, 
+            liveSyncEnabled: settings.liveSyncEnabled??false,
+            cloudApiUrl: settings.cloudApiUrl || 'https://super-thunder-bdfe.khaledbcf19.workers.dev'
+        });
     }
-  }, []);
-
+  }, [settings]);
+  
   const save = async (e: React.FormEvent) => { e.preventDefault(); try { if(settings?.id) await db.settings.update(settings.id, fd); else await db.settings.add({...fd, language:'ar'} as any); setMsg({t:'success',tx:'تم حفظ الإعدادات بنجاح'}); setTimeout(()=>setMsg(null),3000); } catch { setMsg({t:'error',tx:'فشل حفظ الإعدادات'}); } };
   const exp = async () => { try { const b = await (db as any).export(); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href=u; a.download=`OmniPOS-Backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); setMsg({t:'success',tx:'تم تصدير قاعدة البيانات بنجاح'}); } catch { setMsg({t:'error',tx:'فشل التصدير'}); } };
   const imp = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if(!f || !confirm('تحذير: سيتم مسح جميع البيانات الحالية واستبدالها بالنسخة الاحتياطية. هل أنت متأكد؟')) return; try { await (db as any).delete(); await (db as any).open(); await (db as any).import(f, { overwriteValues: true, clearTablesBeforeImport: true }); window.location.reload(); } catch { setMsg({t:'error',tx:'فشل استيراد قاعدة البيانات. تأكد من صحة الملف.'}); } };
@@ -46,7 +51,6 @@ export default function SettingsPage() {
   const handleDeleteAllData = async () => {
     try {
         setMsg({ t: 'success', tx: 'جاري حذف جميع البيانات...' });
-        // FIX: Cast db to Dexie to resolve TypeScript error about missing 'close' method.
         (db as Dexie).close();
         await Dexie.delete('OmniPOS_DB');
         setMsg({ t: 'success', tx: 'تم حذف البيانات بنجاح! سيتم إعادة تشغيل التطبيق.' });
@@ -60,17 +64,15 @@ export default function SettingsPage() {
   // Cloud Sync Handlers
   const handleTestAndSave = async () => {
     setConnectionStatus('testing');
-    setConnectionError('');
     try {
-        await testConnection(apiUrl);
-        localStorage.setItem('cloudflare_api_url', apiUrl);
-        window.dispatchEvent(new StorageEvent('storage', { key: 'cloudflare_api_url', newValue: apiUrl }));
+        await testConnection(fd.cloudApiUrl);
+        if (settings?.id) {
+            await db.settings.update(settings.id, { cloudApiUrl: fd.cloudApiUrl });
+        }
         setConnectionStatus('ok');
-        setIsCloudConfigured(true);
         setMsg({ t: 'success', tx: 'تم الاتصال والحفظ بنجاح!' });
     } catch (e: any) {
         setConnectionStatus('error');
-        setConnectionError(e.message || 'حدث خطأ غير متوقع');
         setMsg({ t: 'error', tx: `فشل الاتصال: ${e.message}` });
     }
   };
@@ -144,8 +146,8 @@ export default function SettingsPage() {
                         <div className="flex-1">
                             <Input 
                                 label="رابط Worker API" 
-                                value={apiUrl}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiUrl(e.target.value)}
+                                value={fd.cloudApiUrl}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFd({...fd, cloudApiUrl: e.target.value})}
                                 placeholder="https://your-worker.your-name.workers.dev"
                                 className="num-l"
                             />
@@ -153,14 +155,13 @@ export default function SettingsPage() {
                         <Button 
                             type="button" 
                             onClick={handleTestAndSave} 
-                            disabled={connectionStatus === 'testing' || !apiUrl}
+                            disabled={connectionStatus === 'testing' || !fd.cloudApiUrl}
                             className="h-[45px] mt-[22px]"
                         >
                             {connectionStatus === 'testing' ? <Loader2 className="animate-spin" /> : 'حفظ واختبار'}
                         </Button>
                     </div>
                     {connectionStatus === 'ok' && <div className="text-sm text-emerald-600 font-bold flex items-center gap-2 p-2 bg-emerald-50 rounded-lg"><CheckCircle2 size={16}/> متصل بنجاح</div>}
-                    {connectionStatus === 'error' && <div className="text-sm text-red-600 p-3 bg-red-50 rounded-lg border border-red-100">{connectionError}</div>}
                     
                     <div className={`mt-6 pt-6 border-t ${!isCloudConfigured ? 'opacity-50 pointer-events-none' : ''}`}>
                         <Toggle 
@@ -169,7 +170,7 @@ export default function SettingsPage() {
                             onChange={(c:boolean) => setFd({...fd, liveSyncEnabled: c})}
                         />
                         <p className="text-xs text-gray-500 mt-2 px-1">
-                            عند التفعيل، سيتم مزامنة أي تغيير (إضافة، تعديل، حذف) في المنتجات، العملاء، الموردين، والإعدادات تلقائياً مع الخادم.
+                            عند التفعيل، سيتم مزامنة أي تغيير (إضافة، تعديل، حذف) في بيانات التطبيق تلقائياً مع الخادم.
                         </p>
                         <div className="mt-6">
                             <h4 className="font-bold text-sm mb-2">عمليات يدوية</h4>

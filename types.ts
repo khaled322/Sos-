@@ -125,4 +125,5 @@ export interface StoreSettings {
   lastNotificationCheck?: Date;
   receiptFooter?: string;
   liveSyncEnabled: boolean;
+  cloudApiUrl?: string;
 }

@@ -120,21 +120,9 @@ export default function App() {
   const [isInitialSyncing, setIsInitialSyncing] = useState(false);
   const [initialPullAttempted, setInitialPullAttempted] = useState(false);
   
-  // We need a way to react to storage changes, so we use a dummy state that we can update.
-  const [storageVersion, setStorageVersion] = useState(0);
-  
   const cloudConfigured = useMemo(() => {
-    // This memo depends on storageVersion to re-evaluate when localStorage changes.
-    void storageVersion; // a trick to make it a dependency
-    return !!localStorage.getItem('cloudflare_api_url');
-  }, [storageVersion]);
-
-  // Listen to manual storage changes to update cloudConfigured status
-  useEffect(() => {
-    const update = () => setStorageVersion(v => v + 1);
-    window.addEventListener('storage', update);
-    return () => window.removeEventListener('storage', update);
-  }, []);
+    return !!settings?.cloudApiUrl;
+  }, [settings]);
 
   // Effect to manage sync hooks
   useEffect(() => {
@@ -157,7 +145,7 @@ export default function App() {
             console.log("Initial cloud sync completed successfully.");
         } catch (e) {
             console.error("Initial cloud sync failed", e);
-            alert('فشل المزامنة الأولية مع الخادم. قد تكون البيانات المحلية غير محدثة.');
+            alert(`فشل المزامنة الأولية مع الخادم. قد تكون البيانات المحلية غير محدثة. الخطأ: ${e instanceof Error ? e.message : String(e)}`);
         } finally {
             setIsInitialSyncing(false);
         }

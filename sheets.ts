@@ -1,11 +1,12 @@
 import { db } from './db';
 
 // This is the list of tables we want to sync with the cloud.
-export const SYNC_TABLES = ['products', 'customers', 'suppliers', 'categories', 'settings'];
+export const SYNC_TABLES = ['products', 'customers', 'suppliers', 'categories', 'settings', 'invoices', 'financial_records', 'stock_movements', 'notifications'];
 
-// Helper to get configuration from localStorage
-const getCloudConfig = () => {
-    const apiUrl = localStorage.getItem('cloudflare_api_url');
+// Helper to get configuration from the database
+const getCloudConfig = async () => {
+    const settings = await db.settings.get(1); // Assuming settings ID is always 1
+    const apiUrl = settings?.cloudApiUrl;
     if (!apiUrl) {
         return null;
     }
@@ -14,8 +15,8 @@ const getCloudConfig = () => {
 
 // Generic fetch wrapper
 const cloudFetch = async (endpoint: string, options: RequestInit = {}) => {
-    const config = getCloudConfig();
-    if (!config) throw new Error("إعدادات Cloudflare غير موجودة.");
+    const config = await getCloudConfig();
+    if (!config) throw new Error("إعدادات Cloudflare غير موجودة في قاعدة البيانات. يرجى ضبطها في صفحة الإعدادات.");
 
     const response = await fetch(`${config.apiUrl}${endpoint}`, {
         ...options,
@@ -47,8 +48,9 @@ export const syncChange = async (
     pkValue: number,
     data?: any
 ) => {
-    if (!getCloudConfig()) {
-        console.warn('Live sync failed: Cloudflare configuration not set.');
+    const config = await getCloudConfig();
+    if (!config) {
+        console.warn('Live sync failed: Cloudflare configuration not set in DB.');
         return;
     }
 

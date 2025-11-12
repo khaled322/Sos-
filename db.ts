@@ -16,8 +16,9 @@ export class OmniPOSDatabase extends Dexie {
 
   constructor() {
     super('OmniPOS_DB');
-    // Version 10: Critical update to index debt fields for reliable querying
-    (this as any).version(10).stores({
+    // Version 13: Re-consolidates schema to force an upgrade for users with broken states.
+    // This is the definitive version ensuring all tables exist and settings are correct.
+    (this as any).version(13).stores({
       products: '++id, name, category, barcode, stock, createdAt',
       customers: '++id, name, phone, barcode, debt, nextPaymentDate, createdAt',
       suppliers: '++id, name, debtToSupplier, nextPaymentDate, createdAt',
@@ -27,6 +28,36 @@ export class OmniPOSDatabase extends Dexie {
       stock_movements: '++id, productId, type, date, invoiceId',
       settings: '++id',
       categories: '++id, &name'
+    }).upgrade(async (tx: any) => {
+        // This upgrade script runs for anyone with a DB version < 13.
+        const settingsTable = tx.table('settings');
+        const existingSettings = await settingsTable.get(1);
+
+        if (!existingSettings) {
+            console.log("Settings not found during v13 upgrade. Populating default settings.");
+            await settingsTable.add({
+                id: 1, // Explicitly set ID
+                storeName: 'متجري المميز',
+                currency: 'د.ج',
+                language: 'ar',
+                themeColor: 'indigo',
+                posShowImages: true,
+                posShowStock: true,
+                loyaltyEnabled: true,
+                spendPerPoint: 100,
+                pointValue: 10,
+                minPointsToRedeem: 50,
+                receiptFooter: 'شكراً لزيارتكم، نتشرف بخدمتكم دائماً!',
+                liveSyncEnabled: true,
+                cloudApiUrl: 'https://super-thunder-bdfe.khaledbcf19.workers.dev',
+            });
+        } else if (existingSettings && !existingSettings.cloudApiUrl) {
+             console.log("Upgrading existing settings for v13 to add cloudApiUrl.");
+            // Only update if the specific field is missing to avoid overwriting user changes.
+            await settingsTable.update(1, { 
+                cloudApiUrl: 'https://super-thunder-bdfe.khaledbcf19.workers.dev',
+            });
+        }
     });
   }
 }
@@ -47,6 +78,7 @@ export const db = new OmniPOSDatabase();
     minPointsToRedeem: 50,
     receiptFooter: 'شكراً لزيارتكم، نتشرف بخدمتكم دائماً!',
     liveSyncEnabled: true,
+    cloudApiUrl: 'https://super-thunder-bdfe.khaledbcf19.workers.dev',
   });
 
   await db.categories.bulkAdd([
