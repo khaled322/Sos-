@@ -16,7 +16,13 @@ export default function SettingsPage() {
 
   const [apiUrl, setApiUrl] = useState('');
   const [apiToken, setApiToken] = useState('');
-  const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'ok' | 'error'>('unknown');
+  const [connectionStatus, setConnectionStatus] = useState<{
+    d1: { status: 'unknown' | 'ok' | 'error', message: string },
+    r2: { status: 'unknown' | 'ok' | 'error', message: string }
+  }>({
+    d1: { status: 'unknown', message: '' },
+    r2: { status: 'unknown', message: '' }
+  });
   const [syncing, setSyncing] = useState<string|null>(null);
 
   useEffect(() => { if (settings) setFd({ storeName: settings.storeName||'', storeAddress: settings.storeAddress||'', storePhone: settings.storePhone||'', receiptFooter: settings.receiptFooter||'شكراً لزيارتكم!', currency: settings.currency, themeColor: settings.themeColor||'indigo', posShowImages: settings.posShowImages??true, posShowStock: settings.posShowStock??true, loyaltyEnabled: settings.loyaltyEnabled??false, spendPerPoint: settings.spendPerPoint??100, pointValue: settings.pointValue??10, minPointsToRedeem: settings.minPointsToRedeem??50, liveSyncEnabled: settings.liveSyncEnabled??false }); }, [settings]);
@@ -27,26 +33,48 @@ export default function SettingsPage() {
       if (savedUrl) setApiUrl(savedUrl);
       if (savedToken) setApiToken(savedToken);
       if(savedUrl && savedToken) {
-          // Re-test connection silently on load to verify credentials
           testConnection(savedUrl, savedToken)
-              .then(() => setConnectionStatus('ok'))
-              .catch(() => setConnectionStatus('error'));
+              .then(result => {
+                  setConnectionStatus({
+                      d1: { status: result.d1?.includes('✅') ? 'ok' : 'error', message: result.d1 || 'No response from worker for D1.' },
+                      r2: { status: result.r2?.includes('✅') ? 'ok' : 'error', message: result.r2 || 'No response from worker for R2.' }
+                  });
+              })
+              .catch((e: any) => setConnectionStatus({
+                  d1: { status: 'error', message: e.message || 'Failed to connect to worker.' },
+                  r2: { status: 'unknown', message: '' }
+              }));
       }
   }, []);
 
   const handleSaveAndTestConnection = async () => {
         setSyncing("جاري اختبار الاتصال...");
-        setConnectionStatus('unknown');
+        setConnectionStatus({ d1: { status: 'unknown', message: '' }, r2: { status: 'unknown', message: '' } });
         try {
-            await testConnection(apiUrl, apiToken);
+            const result = await testConnection(apiUrl, apiToken);
             localStorage.setItem('cloudflare_api_url', apiUrl);
             localStorage.setItem('cloudflare_api_token', apiToken);
-            setConnectionStatus('ok');
-            setMsg({ t: 'success', tx: 'تم حفظ الإعدادات والاتصال ناجح!' });
-            // This is a way to notify other components about the storage change
+            
+            const d1Status = result.d1?.includes('✅') ? 'ok' : 'error';
+            const r2Status = result.r2?.includes('✅') ? 'ok' : 'error';
+
+            setConnectionStatus({
+                d1: { status: d1Status, message: result.d1 || 'No response from worker for D1.' },
+                r2: { status: r2Status, message: result.r2 || 'No response from worker for R2.' }
+            });
+
+            if (d1Status === 'ok') {
+                setMsg({ t: 'success', tx: 'تم حفظ الإعدادات والاتصال بقاعدة البيانات (D1) ناجح.' });
+            } else {
+                setMsg({ t: 'error', tx: 'تم حفظ الإعدادات لكن فشل الاتصال بقاعدة البيانات (D1).' });
+            }
+
             window.dispatchEvent(new Event("storage"));
         } catch (e: any) {
-            setConnectionStatus('error');
+            setConnectionStatus({
+                d1: { status: 'error', message: e.message || 'Failed to connect to worker.' },
+                r2: { status: 'unknown', message: '' }
+            });
             setMsg({ t: 'error', tx: `فشل الاتصال: ${e.message}` });
         } finally {
             setSyncing(null);
@@ -54,7 +82,7 @@ export default function SettingsPage() {
     };
 
   const handlePush = async () => {
-      if (connectionStatus !== 'ok') { setMsg({t:'error', tx: 'الرجاء التأكد من صحة إعدادات الاتصال أولاً'}); return; }
+      if (connectionStatus.d1.status !== 'ok') { setMsg({t:'error', tx: 'الاتصال بقاعدة البيانات (D1) مطلوب للمزامنة. يرجى التأكد من صحة الإعدادات.'}); return; }
       setSyncing("جاري رفع كل البيانات إلى الخادم...");
       try {
           await pushToCloud();
@@ -64,7 +92,7 @@ export default function SettingsPage() {
   };
 
    const handlePull = async () => {
-      if (connectionStatus !== 'ok') { setMsg({t:'error', tx: 'الرجاء التأكد من صحة إعدادات الاتصال أولاً'}); return; }
+      if (connectionStatus.d1.status !== 'ok') { setMsg({t:'error', tx: 'الاتصال بقاعدة البيانات (D1) مطلوب للمزامنة. يرجى التأكد من صحة الإعدادات.'}); return; }
       if (!confirm('تحذير: سيتم مسح البيانات المحلية واستبدالها بالبيانات من الخادم. هل أنت متأكد؟')) return;
       setSyncing("جاري سحب كل البيانات من الخادم...");
       try {
@@ -111,10 +139,28 @@ export default function SettingsPage() {
                 <Section title="المزامنة السحابية (D1 & R2)" icon={Database}>
                     <div className="space-y-6">
                         <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <h3 className="font-bold text-lg text-gray-800">الخطوة 1: إعدادات الاتصال</h3>
-                                {connectionStatus === 'ok' && <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><CheckCircle2 size={14}/> متصل</div>}
-                                {connectionStatus === 'error' && <div className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full"><AlertTriangle size={14}/> فشل الاتصال</div>}
+                             <h3 className="font-bold text-lg text-gray-800 mb-1">الخطوة 1: إعدادات الاتصال</h3>
+                             <div className="mb-4">
+                                <div className="flex flex-col gap-2">
+                                    {connectionStatus.d1.status !== 'unknown' && (
+                                        <div className={`flex items-start gap-3 p-3 rounded-xl ${connectionStatus.d1.status === 'ok' ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-red-50 text-red-800 border border-red-100'}`}>
+                                            <Database size={18} className="shrink-0 mt-0.5"/>
+                                            <div>
+                                                <span className="font-bold">قاعدة البيانات (D1): {connectionStatus.d1.status === 'ok' ? 'متصل' : 'فشل'}</span>
+                                                {connectionStatus.d1.status !== 'ok' && <p className="text-xs mt-1 opacity-80 num-l">{connectionStatus.d1.message}</p>}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {connectionStatus.r2.status !== 'unknown' && (
+                                         <div className={`flex items-start gap-3 p-3 rounded-xl ${connectionStatus.r2.status === 'ok' ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-red-50 text-red-800 border border-red-100'}`}>
+                                            <Upload size={18} className="shrink-0 mt-0.5"/>
+                                            <div>
+                                                <span className="font-bold">التخزين (R2): {connectionStatus.r2.status === 'ok' ? 'متصل' : 'فشل'}</span>
+                                                {connectionStatus.r2.status !== 'ok' && <p className="text-xs mt-1 opacity-80 num-l">{connectionStatus.r2.message}</p>}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <p className="text-gray-500 mb-4 text-sm">أدخل بيانات الاتصال بالخادم السحابي الذي قمت بإعداده على Cloudflare. رابط العامل (Worker URL) هو الرابط العام الذي يظهر بعد نشر العامل، ومفتاح API Token هو مفتاح سري تقوم بإنشائه للوصول الآمن.</p>
                             <div className="space-y-4">
@@ -126,7 +172,7 @@ export default function SettingsPage() {
                             </Button>
                         </div>
 
-                        {connectionStatus === 'ok' && (
+                        {connectionStatus.d1.status === 'ok' && (
                             <div className="pt-4 space-y-6 animate-in fade-in">
                                 <div>
                                     <h3 className="font-bold text-lg mb-2 text-gray-800">الخطوة 2: تفعيل المزامنة</h3>

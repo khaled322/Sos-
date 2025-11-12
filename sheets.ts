@@ -104,7 +104,7 @@ export const pullFromCloud = async () => {
 // Test connection function
 export const testConnection = async (apiUrl: string, apiToken: string) => {
      if (!apiUrl || !apiToken) throw new Error("لا يمكن ترك حقول رابط API ومفتاح API فارغة.");
-     const response = await fetch(`${apiUrl}/sync/health`, {
+     const response = await fetch(`${apiUrl}/test/health`, {
         headers: { 'Authorization': `Bearer ${apiToken}` },
     });
     if (!response.ok) {
