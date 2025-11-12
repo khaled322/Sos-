@@ -16,7 +16,7 @@ const getCloudConfig = () => {
 // Generic fetch wrapper
 const cloudFetch = async (endpoint: string, options: RequestInit = {}) => {
     const config = getCloudConfig();
-    if (!config) throw new Error("Cloudflare configuration not found.");
+    if (!config) throw new Error("إعدادات Cloudflare غير موجودة.");
 
     const response = await fetch(`${config.apiUrl}${endpoint}`, {
         ...options,
@@ -29,9 +29,9 @@ const cloudFetch = async (endpoint: string, options: RequestInit = {}) => {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new Error(`API Error (${response.status}): ${errorData.message || 'Unknown error'}`);
+        throw new Error(`خطأ في الاتصال بالخادم (${response.status}): ${errorData.message || 'خطأ غير معروف'}`);
     }
-    // Handle cases with no JSON response body
+    
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") !== -1) {
         return response.json();
@@ -46,8 +46,7 @@ export const syncChange = async (
     pkValue: number,
     data?: any
 ) => {
-    const config = getCloudConfig();
-    if (!config) {
+    if (!getCloudConfig()) {
         console.warn('Live sync failed: Cloudflare configuration not set.');
         return;
     }
@@ -61,7 +60,6 @@ export const syncChange = async (
         });
     } catch (error) {
         console.error(`Cloudflare sync error (${operation} on ${tableName}):`, error);
-        // Implement a retry queue or user notification for production
     }
 };
 
@@ -89,7 +87,7 @@ export const pullFromCloud = async () => {
         for (const tableName of SYNC_TABLES) {
             const table = (db as any)[tableName];
             await table.clear();
-            if (data[tableName] && data[tableName].length > 0) {
+            if (data[tableName] && Array.isArray(data[tableName]) && data[tableName].length > 0) {
                 // D1 will return dates as ISO strings. We need to convert them back to Date objects for Dexie.
                 const items = data[tableName].map((item: any) => {
                     if (item.createdAt && typeof item.createdAt === 'string') item.createdAt = new Date(item.createdAt);
@@ -105,9 +103,14 @@ export const pullFromCloud = async () => {
 
 // Test connection function
 export const testConnection = async (apiUrl: string, apiToken: string) => {
+     if (!apiUrl || !apiToken) throw new Error("لا يمكن ترك حقول رابط API ومفتاح API فارغة.");
      const response = await fetch(`${apiUrl}/sync/health`, {
         headers: { 'Authorization': `Bearer ${apiToken}` },
     });
-    if (!response.ok) throw new Error("Connection failed or invalid credentials.");
+    if (!response.ok) {
+        if (response.status === 403) throw new Error("فشلت المصادقة. تحقق من مفتاح API Token.");
+        if (response.status === 404) throw new Error("نقطة النهاية غير موجودة. تحقق من رابط Worker API URL.");
+        throw new Error(`فشل الاتصال بالحالة: ${response.status}`);
+    }
     return response.json();
 }

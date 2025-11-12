@@ -26,7 +26,12 @@ export default function SettingsPage() {
       const savedToken = localStorage.getItem('cloudflare_api_token');
       if (savedUrl) setApiUrl(savedUrl);
       if (savedToken) setApiToken(savedToken);
-      if(savedUrl && savedToken) setConnectionStatus('ok'); // Assume ok if already saved
+      if(savedUrl && savedToken) {
+          // Re-test connection silently on load to verify credentials
+          testConnection(savedUrl, savedToken)
+              .then(() => setConnectionStatus('ok'))
+              .catch(() => setConnectionStatus('error'));
+      }
   }, []);
 
   const handleSaveAndTestConnection = async () => {
@@ -49,7 +54,7 @@ export default function SettingsPage() {
     };
 
   const handlePush = async () => {
-      if (!apiUrl || !apiToken) { setMsg({t:'error', tx: 'الرجاء إدخال إعدادات الاتصال أولاً'}); return; }
+      if (connectionStatus !== 'ok') { setMsg({t:'error', tx: 'الرجاء التأكد من صحة إعدادات الاتصال أولاً'}); return; }
       setSyncing("جاري رفع كل البيانات إلى الخادم...");
       try {
           await pushToCloud();
@@ -59,7 +64,7 @@ export default function SettingsPage() {
   };
 
    const handlePull = async () => {
-      if (!apiUrl || !apiToken) { setMsg({t:'error', tx: 'الرجاء إدخال إعدادات الاتصال أولاً'}); return; }
+      if (connectionStatus !== 'ok') { setMsg({t:'error', tx: 'الرجاء التأكد من صحة إعدادات الاتصال أولاً'}); return; }
       if (!confirm('تحذير: سيتم مسح البيانات المحلية واستبدالها بالبيانات من الخادم. هل أنت متأكد؟')) return;
       setSyncing("جاري سحب كل البيانات من الخادم...");
       try {
@@ -106,11 +111,15 @@ export default function SettingsPage() {
                 <Section title="المزامنة السحابية (D1 & R2)" icon={Database}>
                     <div className="space-y-6">
                         <div>
-                            <h3 className="font-bold text-lg mb-1 text-gray-800">الخطوة 1: إعدادات الاتصال</h3>
-                            <p className="text-gray-500 mb-4 text-sm">أدخل بيانات الاتصال بالخادم السحابي الذي قمت بإعداده على Cloudflare.</p>
+                            <div className="flex justify-between items-center mb-1">
+                                <h3 className="font-bold text-lg text-gray-800">الخطوة 1: إعدادات الاتصال</h3>
+                                {connectionStatus === 'ok' && <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full"><CheckCircle2 size={14}/> متصل</div>}
+                                {connectionStatus === 'error' && <div className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full"><AlertTriangle size={14}/> فشل الاتصال</div>}
+                            </div>
+                            <p className="text-gray-500 mb-4 text-sm">أدخل بيانات الاتصال بالخادم السحابي الذي قمت بإعداده على Cloudflare. رابط العامل (Worker URL) هو الرابط العام الذي يظهر بعد نشر العامل، ومفتاح API Token هو مفتاح سري تقوم بإنشائه للوصول الآمن.</p>
                             <div className="space-y-4">
-                                <Input label="رابط API Endpoint" value={apiUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiUrl(e.target.value)} placeholder="https://your-worker.your-domain.workers.dev" icon={LinkIcon}/>
-                                <Input label="مفتاح API / Token" type="password" value={apiToken} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiToken(e.target.value)} placeholder="••••••••••••••••••••" icon={KeyRound}/>
+                                <Input label="رابط Worker API URL" value={apiUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiUrl(e.target.value)} placeholder="https://your-worker.workers.dev" icon={LinkIcon}/>
+                                <Input label="مفتاح API Token" type="password" value={apiToken} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiToken(e.target.value)} placeholder="••••••••••••••••••••" icon={KeyRound}/>
                             </div>
                             <Button type="button" onClick={handleSaveAndTestConnection} disabled={!!syncing || !apiUrl || !apiToken} className="w-full mt-4 h-12">
                                 {syncing === "جاري اختبار الاتصال..." ? <Loader2 className="animate-spin" /> : 'حفظ واختبار الاتصال'}
