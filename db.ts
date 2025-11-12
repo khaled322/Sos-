@@ -16,9 +16,9 @@ export class OmniPOSDatabase extends Dexie {
 
   constructor() {
     super('OmniPOS_DB');
-    // Version 13: Re-consolidates schema to force an upgrade for users with broken states.
-    // This is the definitive version ensuring all tables exist and settings are correct.
-    (this as any).version(13).stores({
+    // Version 14: Re-consolidates schema again to ensure any failed previous upgrades are fixed.
+    // This should resolve NotFoundError by ensuring all tables are present.
+    (this as any).version(14).stores({
       products: '++id, name, category, barcode, stock, createdAt',
       customers: '++id, name, phone, barcode, debt, nextPaymentDate, createdAt',
       suppliers: '++id, name, debtToSupplier, nextPaymentDate, createdAt',
@@ -29,12 +29,12 @@ export class OmniPOSDatabase extends Dexie {
       settings: '++id',
       categories: '++id, &name'
     }).upgrade(async (tx: any) => {
-        // This upgrade script runs for anyone with a DB version < 13.
+        // This upgrade script runs for anyone with a DB version < 14.
         const settingsTable = tx.table('settings');
         const existingSettings = await settingsTable.get(1);
 
         if (!existingSettings) {
-            console.log("Settings not found during v13 upgrade. Populating default settings.");
+            console.log("Settings not found during v14 upgrade. Populating default settings.");
             await settingsTable.add({
                 id: 1, // Explicitly set ID
                 storeName: 'متجري المميز',
@@ -51,8 +51,8 @@ export class OmniPOSDatabase extends Dexie {
                 liveSyncEnabled: true,
                 cloudApiUrl: 'https://super-thunder-bdfe.khaledbcf19.workers.dev',
             });
-        } else if (existingSettings && !existingSettings.cloudApiUrl) {
-             console.log("Upgrading existing settings for v13 to add cloudApiUrl.");
+        } else if (existingSettings && typeof existingSettings.cloudApiUrl === 'undefined') {
+             console.log("Upgrading existing settings for v14 to add cloudApiUrl.");
             // Only update if the specific field is missing to avoid overwriting user changes.
             await settingsTable.update(1, { 
                 cloudApiUrl: 'https://super-thunder-bdfe.khaledbcf19.workers.dev',
