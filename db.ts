@@ -46,7 +46,7 @@ export const db = new OmniPOSDatabase();
     pointValue: 10,
     minPointsToRedeem: 50,
     receiptFooter: 'شكراً لزيارتكم، نتشرف بخدمتكم دائماً!',
-    liveSyncEnabled: false,
+    liveSyncEnabled: true,
   });
 
   await db.categories.bulkAdd([

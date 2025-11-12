@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import 'dexie-export-import';
+import Dexie from 'dexie';
 import { db } from '../db';
 import { Button } from '../components/ui/Button';
-import { Download, Upload, AlertTriangle, CheckCircle2, Store, Coins, Award, Palette, Monitor, Receipt, Database, Cloud, Loader2 } from 'lucide-react';
+import { Download, Upload, AlertTriangle, CheckCircle2, Store, Coins, Award, Palette, Monitor, Receipt, Database, Cloud, Loader2, Trash2 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { testConnection, pushToCloud, pullFromCloud } from '../sheets';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
@@ -21,6 +22,7 @@ export default function SettingsPage() {
   const [connectionError, setConnectionError] = useState('');
   const [isSyncing, setIsSyncing] = useState<'push' | 'pull' | null>(null);
   const [pullConfirm, setPullConfirm] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isCloudConfigured, setIsCloudConfigured] = useState(false);
 
   useEffect(() => { if (settings) setFd({ storeName: settings.storeName||'', storeAddress: settings.storeAddress||'', storePhone: settings.storePhone||'', receiptFooter: settings.receiptFooter||'شكراً لزيارتكم!', currency: settings.currency, themeColor: settings.themeColor||'indigo', posShowImages: settings.posShowImages??true, posShowStock: settings.posShowStock??true, loyaltyEnabled: settings.loyaltyEnabled??false, spendPerPoint: settings.spendPerPoint??100, pointValue: settings.pointValue??10, minPointsToRedeem: settings.minPointsToRedeem??50, liveSyncEnabled: settings.liveSyncEnabled??false }); }, [settings]);
@@ -28,8 +30,10 @@ export default function SettingsPage() {
   // Effect to load initial cloud URL
   useEffect(() => {
     const savedUrl = localStorage.getItem('cloudflare_api_url');
+    const defaultUrl = 'https://super-thunder-bdfe.khaledbcf19.workers.dev';
+    setApiUrl(savedUrl || defaultUrl);
+
     if (savedUrl) {
-        setApiUrl(savedUrl);
         setIsCloudConfigured(true);
         setConnectionStatus('unknown'); // User must re-test to confirm it's still valid
     }
@@ -38,6 +42,20 @@ export default function SettingsPage() {
   const save = async (e: React.FormEvent) => { e.preventDefault(); try { if(settings?.id) await db.settings.update(settings.id, fd); else await db.settings.add({...fd, language:'ar'} as any); setMsg({t:'success',tx:'تم حفظ الإعدادات بنجاح'}); setTimeout(()=>setMsg(null),3000); } catch { setMsg({t:'error',tx:'فشل حفظ الإعدادات'}); } };
   const exp = async () => { try { const b = await (db as any).export(); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href=u; a.download=`OmniPOS-Backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); setMsg({t:'success',tx:'تم تصدير قاعدة البيانات بنجاح'}); } catch { setMsg({t:'error',tx:'فشل التصدير'}); } };
   const imp = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if(!f || !confirm('تحذير: سيتم مسح جميع البيانات الحالية واستبدالها بالنسخة الاحتياطية. هل أنت متأكد؟')) return; try { await (db as any).delete(); await (db as any).open(); await (db as any).import(f, { overwriteValues: true, clearTablesBeforeImport: true }); window.location.reload(); } catch { setMsg({t:'error',tx:'فشل استيراد قاعدة البيانات. تأكد من صحة الملف.'}); } };
+  
+  const handleDeleteAllData = async () => {
+    try {
+        setMsg({ t: 'success', tx: 'جاري حذف جميع البيانات...' });
+        // FIX: Cast db to Dexie to resolve TypeScript error about missing 'close' method.
+        (db as Dexie).close();
+        await Dexie.delete('OmniPOS_DB');
+        setMsg({ t: 'success', tx: 'تم حذف البيانات بنجاح! سيتم إعادة تشغيل التطبيق.' });
+        setTimeout(() => window.location.reload(), 1500);
+    } catch (e) {
+        console.error("Failed to delete database:", e);
+        setMsg({ t: 'error', tx: 'فشل حذف قاعدة البيانات. حاول إغلاق أي علامات تبويب أخرى للتطبيق والمحاولة مرة أخرى.' });
+    }
+  };
 
   // Cloud Sync Handlers
   const handleTestAndSave = async () => {
@@ -116,20 +134,7 @@ export default function SettingsPage() {
                  <Section title="تخصيص الوصل" icon={Receipt}>
                     <Input label="تذييل الوصل (رسالة الشكر)" value={fd.receiptFooter} onChange={(e:React.ChangeEvent<HTMLInputElement>)=>setFd({...fd,receiptFooter:e.target.value})}/>
                 </Section>
-            </div>
 
-            <div className="space-y-6">
-                <Section title="المظهر والألوان" icon={Palette}>
-                    <div className="mb-4"><label className="block text-sm font-medium mb-2">لون النظام الرئيسي</label><div className="flex gap-3 flex-wrap">{THEMES.map(t=>(<button key={t.id} type="button" onClick={()=>setFd({...fd,themeColor:t.id})} className={`w-10 h-10 rounded-full ${t.c} flex items-center justify-center transition-all active:scale-95 ${fd.themeColor===t.id?'ring-4 ring-gray-200 scale-110':''}`}>{fd.themeColor===t.id && <CheckCircle2 className="text-white" size={18}/>}</button>))}</div></div>
-                </Section>
-
-                <Section title="إعدادات نقطة البيع" icon={Monitor}>
-                     <div className="space-y-2">
-                        <Toggle label="عرض صور المنتجات في شبكة البيع" checked={fd.posShowImages} onChange={(c:boolean)=>setFd({...fd,posShowImages:c})}/>
-                        <Toggle label="عرض كمية المخزون المتبقية" checked={fd.posShowStock} onChange={(c:boolean)=>setFd({...fd,posShowStock:c})}/>
-                     </div>
-                </Section>
-                
                 <Section title="المزامنة السحابية" icon={Cloud}>
                     <p className="text-sm text-gray-500 mb-4">
                         قم بربط البرنامج مع خادم Cloudflare D1 لمزامنة بياناتك عبر الأجهزة.
@@ -181,15 +186,43 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </Section>
+            </div>
 
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-100">
-                    <h2 className="text-lg font-bold flex items-center gap-2 mb-6 text-orange-700"><Database size={20}/> النسخ الاحتياطي المحلي</h2>
-                    <div className="grid grid-cols-2 gap-4">
-                        <Button type="button" variant="secondary" onClick={exp} className="gap-2 h-auto py-3 flex-col sm:flex-row bg-white"><Download size={18}/> تصدير نسخة احتياطية</Button>
-                        <Button type="button" variant="secondary" onClick={()=>fileRef.current?.click()} className="gap-2 h-auto py-3 text-orange-600 border-orange-100 hover:bg-orange-50 hover:border-orange-200 flex-col sm:flex-row"><Upload size={18}/> استيراد نسخة</Button>
+            <div className="space-y-6">
+                <Section title="تخصيص المظهر ونقطة البيع" icon={Palette}>
+                    <div className="mb-4"><label className="block text-sm font-medium mb-2">لون النظام الرئيسي</label><div className="flex gap-3 flex-wrap">{THEMES.map(t=>(<button key={t.id} type="button" onClick={()=>setFd({...fd,themeColor:t.id})} className={`w-10 h-10 rounded-full ${t.c} flex items-center justify-center transition-all active:scale-95 ${fd.themeColor===t.id?'ring-4 ring-gray-200 scale-110':''}`}>{fd.themeColor===t.id && <CheckCircle2 className="text-white" size={18}/>}</button>))}</div></div>
+                    <div className="space-y-2 pt-4 border-t">
+                        <Toggle label="عرض صور المنتجات في شبكة البيع" checked={fd.posShowImages} onChange={(c:boolean)=>setFd({...fd,posShowImages:c})}/>
+                        <Toggle label="عرض كمية المخزون المتبقية" checked={fd.posShowStock} onChange={(c:boolean)=>setFd({...fd,posShowStock:c})}/>
                     </div>
-                    <input type="file" ref={fileRef} onChange={imp} className="hidden" accept=".json"/>
-                    <p className="text-xs text-gray-400 mt-4 text-center">احتفظ بنسخ احتياطية دورية لتجنب فقدان البيانات.</p>
+                </Section>
+                
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-red-200">
+                    <h2 className="text-lg font-bold flex items-center gap-2 mb-4 text-red-700"><AlertTriangle size={20}/> منطقة الخطر</h2>
+                    <div className="space-y-4">
+                        <div>
+                            <h3 className="font-medium text-gray-800">النسخ الاحتياطي المحلي</h3>
+                            <p className="text-xs text-gray-500 mb-3">استيراد نسخة احتياطية سيؤدي إلى حذف البيانات الحالية.</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <Button type="button" variant="secondary" onClick={exp} className="gap-2 bg-white"><Download size={16}/> تصدير</Button>
+                                <Button type="button" variant="secondary" onClick={()=>fileRef.current?.click()} className="gap-2 bg-white"><Upload size={16}/> استيراد</Button>
+                            </div>
+                            <input type="file" ref={fileRef} onChange={imp} className="hidden" accept=".json"/>
+                        </div>
+                        <div className="pt-4 border-t border-red-100">
+                            <h3 className="font-medium text-gray-800">إعادة ضبط المصنع</h3>
+                            <p className="text-xs text-gray-500 mb-3">حذف جميع بيانات التطبيق بشكل نهائي والبدء من جديد.</p>
+                            <Button
+                                type="button"
+                                variant="danger"
+                                onClick={() => setIsDeleteConfirmOpen(true)}
+                                className="w-full gap-2"
+                            >
+                                <Trash2 size={16}/>
+                                مسح جميع البيانات
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div className="lg:col-span-2 sticky bottom-6 z-10"><Button type="submit" size="lg" className="w-full h-14 text-lg shadow-lg">حفظ كافة الإعدادات</Button></div>
@@ -201,6 +234,15 @@ export default function SettingsPage() {
             title="تأكيد سحب البيانات؟"
             message="تحذير! هذه العملية ستحذف جميع البيانات المحلية الحالية وتستبدلها بالبيانات الموجودة في السحابة. لا يمكن التراجع عن هذا الإجراء."
             confirmText="نعم، اسحب البيانات"
+        />
+        <ConfirmModal
+            isOpen={isDeleteConfirmOpen}
+            onClose={() => setIsDeleteConfirmOpen(false)}
+            onConfirm={handleDeleteAllData}
+            title="تأكيد حذف جميع البيانات؟"
+            message="هل أنت متأكد تماماً؟ سيتم حذف كل شيء في التطبيق بشكل نهائي ولا يمكن استرجاعه. هذا الإجراء يعادل إعادة ضبط المصنع."
+            confirmText="نعم، احذف كل شيء"
+            variant="danger"
         />
       </div>
     </div>
