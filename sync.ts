@@ -3,7 +3,7 @@ import { syncChange } from './sheets';
 
 let hooksAttached = false;
 
-const SYNC_TABLES = ['products', 'customers', 'suppliers', 'categories'];
+const SYNC_TABLES = ['products', 'customers', 'suppliers', 'categories', 'settings'];
 
 export function setupSyncHooks() {
     if (hooksAttached) return;

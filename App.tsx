@@ -126,7 +126,7 @@ export default function App() {
   const cloudConfigured = useMemo(() => {
     // This memo depends on storageVersion to re-evaluate when localStorage changes.
     void storageVersion; // a trick to make it a dependency
-    return !!localStorage.getItem('cloudflare_api_url') && !!localStorage.getItem('cloudflare_api_token');
+    return !!localStorage.getItem('cloudflare_api_url');
   }, [storageVersion]);
 
   // Listen to manual storage changes to update cloudConfigured status

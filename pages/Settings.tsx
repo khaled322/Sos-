@@ -2,9 +2,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import 'dexie-export-import';
 import { db } from '../db';
 import { Button } from '../components/ui/Button';
-import { Download, Upload, AlertTriangle, CheckCircle2, Store, Coins, Award, Palette, Monitor, Receipt, Database, RefreshCw, Zap, Loader2, Link as LinkIcon, KeyRound } from 'lucide-react';
+import { Download, Upload, AlertTriangle, CheckCircle2, Store, Coins, Award, Palette, Monitor, Receipt, Database } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { pushToCloud, pullFromCloud, testConnection } from '../sheets';
 
 const THEMES = [ {id:'indigo',n:'نيلي',c:'bg-indigo-600'}, {id:'emerald',n:'زمردي',c:'bg-emerald-600'}, {id:'rose',n:'وردي',c:'bg-rose-600'}, {id:'amber',n:'عنبري',c:'bg-amber-600'}, {id:'violet',n:'بنفسجي',c:'bg-violet-600'}, {id:'sky',n:'سماوي',c:'bg-sky-600'} ];
 
@@ -14,95 +13,8 @@ export default function SettingsPage() {
   const settings = useLiveQuery(() => db.settings.toArray())?.[0];
   const [fd, setFd] = useState({ storeName: '', storeAddress: '', storePhone: '', receiptFooter: '', currency: '', themeColor: 'indigo', posShowImages: true, posShowStock: true, loyaltyEnabled: false, spendPerPoint: 100, pointValue: 10, minPointsToRedeem: 50, liveSyncEnabled: false });
 
-  const [apiUrl, setApiUrl] = useState('');
-  const [apiToken, setApiToken] = useState('');
-  const [connectionStatus, setConnectionStatus] = useState<{
-    d1: { status: 'unknown' | 'ok' | 'error', message: string },
-    r2: { status: 'unknown' | 'ok' | 'error', message: string }
-  }>({
-    d1: { status: 'unknown', message: '' },
-    r2: { status: 'unknown', message: '' }
-  });
-  const [syncing, setSyncing] = useState<string|null>(null);
-
   useEffect(() => { if (settings) setFd({ storeName: settings.storeName||'', storeAddress: settings.storeAddress||'', storePhone: settings.storePhone||'', receiptFooter: settings.receiptFooter||'شكراً لزيارتكم!', currency: settings.currency, themeColor: settings.themeColor||'indigo', posShowImages: settings.posShowImages??true, posShowStock: settings.posShowStock??true, loyaltyEnabled: settings.loyaltyEnabled??false, spendPerPoint: settings.spendPerPoint??100, pointValue: settings.pointValue??10, minPointsToRedeem: settings.minPointsToRedeem??50, liveSyncEnabled: settings.liveSyncEnabled??false }); }, [settings]);
   
-  useEffect(() => {
-      const savedUrl = localStorage.getItem('cloudflare_api_url');
-      const savedToken = localStorage.getItem('cloudflare_api_token');
-      if (savedUrl) setApiUrl(savedUrl);
-      if (savedToken) setApiToken(savedToken);
-      if(savedUrl && savedToken) {
-          testConnection(savedUrl, savedToken)
-              .then(result => {
-                  setConnectionStatus({
-                      d1: { status: result.d1?.includes('✅') ? 'ok' : 'error', message: result.d1 || 'No response from worker for D1.' },
-                      r2: { status: result.r2?.includes('✅') ? 'ok' : 'error', message: result.r2 || 'No response from worker for R2.' }
-                  });
-              })
-              .catch((e: any) => setConnectionStatus({
-                  d1: { status: 'error', message: e.message || 'Failed to connect to worker.' },
-                  r2: { status: 'unknown', message: '' }
-              }));
-      }
-  }, []);
-
-  const handleSaveAndTestConnection = async () => {
-        setSyncing("جاري اختبار الاتصال...");
-        setConnectionStatus({ d1: { status: 'unknown', message: '' }, r2: { status: 'unknown', message: '' } });
-        try {
-            const result = await testConnection(apiUrl, apiToken);
-            localStorage.setItem('cloudflare_api_url', apiUrl);
-            localStorage.setItem('cloudflare_api_token', apiToken);
-            
-            const d1Status = result.d1?.includes('✅') ? 'ok' : 'error';
-            const r2Status = result.r2?.includes('✅') ? 'ok' : 'error';
-
-            setConnectionStatus({
-                d1: { status: d1Status, message: result.d1 || 'No response from worker for D1.' },
-                r2: { status: r2Status, message: result.r2 || 'No response from worker for R2.' }
-            });
-
-            if (d1Status === 'ok') {
-                setMsg({ t: 'success', tx: 'تم حفظ الإعدادات والاتصال بقاعدة البيانات (D1) ناجح.' });
-            } else {
-                setMsg({ t: 'error', tx: 'تم حفظ الإعدادات لكن فشل الاتصال بقاعدة البيانات (D1).' });
-            }
-
-            window.dispatchEvent(new Event("storage"));
-        } catch (e: any) {
-            setConnectionStatus({
-                d1: { status: 'error', message: e.message || 'Failed to connect to worker.' },
-                r2: { status: 'unknown', message: '' }
-            });
-            setMsg({ t: 'error', tx: `فشل الاتصال: ${e.message}` });
-        } finally {
-            setSyncing(null);
-        }
-    };
-
-  const handlePush = async () => {
-      if (connectionStatus.d1.status !== 'ok') { setMsg({t:'error', tx: 'الاتصال بقاعدة البيانات (D1) مطلوب للمزامنة. يرجى التأكد من صحة الإعدادات.'}); return; }
-      setSyncing("جاري رفع كل البيانات إلى الخادم...");
-      try {
-          await pushToCloud();
-          setMsg({ t: 'success', tx: 'تم رفع البيانات بنجاح!' });
-      } catch (e: any) { setMsg({ t: 'error', tx: `فشل الرفع: ${e.message}` }); } 
-      finally { setSyncing(null); }
-  };
-
-   const handlePull = async () => {
-      if (connectionStatus.d1.status !== 'ok') { setMsg({t:'error', tx: 'الاتصال بقاعدة البيانات (D1) مطلوب للمزامنة. يرجى التأكد من صحة الإعدادات.'}); return; }
-      if (!confirm('تحذير: سيتم مسح البيانات المحلية واستبدالها بالبيانات من الخادم. هل أنت متأكد؟')) return;
-      setSyncing("جاري سحب كل البيانات من الخادم...");
-      try {
-          await pullFromCloud();
-          setMsg({ t: 'success', tx: 'تم سحب البيانات بنجاح! سيتم تحديث الصفحة.' });
-          setTimeout(() => window.location.reload(), 1500);
-      } catch (e: any) { setMsg({ t: 'error', tx: `فشل السحب: ${e.message}` }); } 
-      finally { setSyncing(null); }
-  };
-
   const save = async (e: React.FormEvent) => { e.preventDefault(); try { if(settings?.id) await db.settings.update(settings.id, fd); else await db.settings.add({...fd, language:'ar'} as any); setMsg({t:'success',tx:'تم حفظ الإعدادات بنجاح'}); setTimeout(()=>setMsg(null),3000); } catch { setMsg({t:'error',tx:'فشل حفظ الإعدادات'}); } };
   const exp = async () => { try { const b = await (db as any).export(); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href=u; a.download=`OmniPOS-Backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); setMsg({t:'success',tx:'تم تصدير قاعدة البيانات بنجاح'}); } catch { setMsg({t:'error',tx:'فشل التصدير'}); } };
   const imp = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if(!f || !confirm('تحذير: سيتم مسح جميع البيانات الحالية واستبدالها بالنسخة الاحتياطية. هل أنت متأكد؟')) return; try { await (db as any).delete(); await (db as any).open(); await (db as any).import(f, { overwriteValues: true, clearTablesBeforeImport: true }); window.location.reload(); } catch { setMsg({t:'error',tx:'فشل استيراد قاعدة البيانات. تأكد من صحة الملف.'}); } };
@@ -135,74 +47,9 @@ export default function SettingsPage() {
                          <div className="sm:col-span-3 text-xs text-gray-500 flex gap-1 items-center"><Coins size={14}/> مثال: العميل يشتري بـ {fd.spendPerPoint * 10} {fd.currency} يحصل على 10 نقاط. يمكنه استبدالها بخصم {10 * fd.pointValue} {fd.currency}.</div>
                     </div>}
                 </Section>
-
-                <Section title="المزامنة السحابية (D1 & R2)" icon={Database}>
-                    <div className="space-y-6">
-                        <div>
-                             <h3 className="font-bold text-lg text-gray-800 mb-1">الخطوة 1: إعدادات الاتصال</h3>
-                             <div className="mb-4">
-                                <div className="flex flex-col gap-2">
-                                    {connectionStatus.d1.status !== 'unknown' && (
-                                        <div className={`flex items-start gap-3 p-3 rounded-xl ${connectionStatus.d1.status === 'ok' ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-red-50 text-red-800 border border-red-100'}`}>
-                                            <Database size={18} className="shrink-0 mt-0.5"/>
-                                            <div>
-                                                <span className="font-bold">قاعدة البيانات (D1): {connectionStatus.d1.status === 'ok' ? 'متصل' : 'فشل'}</span>
-                                                {connectionStatus.d1.status !== 'ok' && <p className="text-xs mt-1 opacity-80 num-l">{connectionStatus.d1.message}</p>}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {connectionStatus.r2.status !== 'unknown' && (
-                                         <div className={`flex items-start gap-3 p-3 rounded-xl ${connectionStatus.r2.status === 'ok' ? 'bg-emerald-50 text-emerald-800 border border-emerald-100' : 'bg-red-50 text-red-800 border border-red-100'}`}>
-                                            <Upload size={18} className="shrink-0 mt-0.5"/>
-                                            <div>
-                                                <span className="font-bold">التخزين (R2): {connectionStatus.r2.status === 'ok' ? 'متصل' : 'فشل'}</span>
-                                                {connectionStatus.r2.status !== 'ok' && <p className="text-xs mt-1 opacity-80 num-l">{connectionStatus.r2.message}</p>}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <p className="text-gray-500 mb-4 text-sm">أدخل بيانات الاتصال بالخادم السحابي الذي قمت بإعداده على Cloudflare. رابط العامل (Worker URL) هو الرابط العام الذي يظهر بعد نشر العامل، ومفتاح API Token هو مفتاح سري تقوم بإنشائه للوصول الآمن.</p>
-                            <div className="space-y-4">
-                                <Input label="رابط Worker API URL" value={apiUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiUrl(e.target.value)} placeholder="https://your-worker.workers.dev" icon={LinkIcon}/>
-                                <Input label="مفتاح API Token" type="password" value={apiToken} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiToken(e.target.value)} placeholder="••••••••••••••••••••" icon={KeyRound}/>
-                            </div>
-                            <Button type="button" onClick={handleSaveAndTestConnection} disabled={!!syncing || !apiUrl || !apiToken} className="w-full mt-4 h-12">
-                                {syncing === "جاري اختبار الاتصال..." ? <Loader2 className="animate-spin" /> : 'حفظ واختبار الاتصال'}
-                            </Button>
-                        </div>
-
-                        {connectionStatus.d1.status === 'ok' && (
-                            <div className="pt-4 space-y-6 animate-in fade-in">
-                                <div>
-                                    <h3 className="font-bold text-lg mb-2 text-gray-800">الخطوة 2: تفعيل المزامنة</h3>
-                                    <Toggle icon={Zap} label="تفعيل المزامنة المباشرة (Live Sync)" checked={fd.liveSyncEnabled} onChange={c => setFd({ ...fd, liveSyncEnabled: c })} />
-                                    <p className="text-xs text-gray-500 -mt-2 px-1">عند التفعيل، سيتم تسجيل كل عملية مباشرة في الخادم السحابي، ويتم سحب البيانات منه عند بدء تشغيل التطبيق. يتطلب اتصالاً بالإنترنت.</p>
-                                </div>
-
-                                <div className="pt-4 border-t">
-                                    <h3 className="font-bold text-lg text-gray-800">أدوات المزامنة اليدوية</h3>
-                                    <p className="text-gray-500 text-sm mt-1 mb-4">تستخدم لنقل البيانات بشكل كامل. مفيدة عند الإعداد الأولي أو استعادة البيانات.</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <Button type="button" variant="secondary" onClick={handlePush} disabled={!!syncing} className="gap-2 bg-white"><Upload size={18}/> رفع الكل الآن</Button>
-                                        <Button type="button" variant="secondary" onClick={handlePull} disabled={!!syncing} className="gap-2 text-red-600 border-red-100 hover:bg-red-50 hover:border-red-200"><Download size={18}/> سحب الكل الآن</Button>
-                                    </div>
-                                </div>
-                                
-                                <div className="pt-4 border-t">
-                                    <h3 className="font-bold text-lg text-gray-800">النسخ الاحتياطي (R2)</h3>
-                                    <p className="text-gray-500 text-sm mt-1 mb-4">إنشاء واستعادة نسخ احتياطية كاملة لقاعدة البيانات على خدمة R2.</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                       <Button type="button" variant="secondary" disabled className="gap-2 bg-white"><Upload size={18}/> إنشاء نسخة احتياطية جديدة</Button>
-                                       <Button type="button" variant="secondary" disabled className="gap-2 bg-white"><Download size={18}/> استعراض واستعادة</Button>
-                                    </div>
-                                     <p className="text-xs text-center mt-3 text-gray-400">ميزة النسخ الاحتياطي على R2 قيد التطوير.</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {syncing && <div className="flex items-center justify-center gap-2 text-primary font-medium p-2 bg-primary/5 rounded-lg mt-4"><RefreshCw className="animate-spin" size={16}/> {syncing}</div>}
-                    </div>
+                
+                 <Section title="تخصيص الوصل" icon={Receipt}>
+                    <Input label="تذييل الوصل (رسالة الشكر)" value={fd.receiptFooter} onChange={(e:React.ChangeEvent<HTMLInputElement>)=>setFd({...fd,receiptFooter:e.target.value})}/>
                 </Section>
             </div>
 
@@ -216,10 +63,6 @@ export default function SettingsPage() {
                         <Toggle label="عرض صور المنتجات في شبكة البيع" checked={fd.posShowImages} onChange={c=>setFd({...fd,posShowImages:c})}/>
                         <Toggle label="عرض كمية المخزون المتبقية" checked={fd.posShowStock} onChange={c=>setFd({...fd,posShowStock:c})}/>
                      </div>
-                </Section>
-                
-                 <Section title="تخصيص الوصل" icon={Receipt}>
-                    <Input label="تذييل الوصل (رسالة الشكر)" value={fd.receiptFooter} onChange={(e:React.ChangeEvent<HTMLInputElement>)=>setFd({...fd,receiptFooter:e.target.value})}/>
                 </Section>
 
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-100">
