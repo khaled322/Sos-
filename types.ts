@@ -1,120 +1,46 @@
-
-
 export interface Product {
-  id?: number;
+  id: number;
   name: string;
   price: number;
   cost: number;
   stock: number;
-  category: string;
-  barcode?: string;
-  description?: string;
-  imageBase64?: string;
-  createdAt: Date;
+  image: string | null;
+  categoryId: number;
+  createdAt: string;
 }
 
 export interface Category {
-  id?: number;
+  id: number;
   name: string;
 }
 
 export interface Customer {
-  id?: number;
+  id: number;
   name: string;
-  phone?: string;
-  email?: string;
-  address?: string;
+  phone: string | null;
+  address: string | null;
+  type: 'customer' | 'supplier';
   debt: number;
-  points: number;
-  barcode?: string;
-  nextPaymentDate?: Date;
-  notes?: string;
-  createdAt?: Date;
-}
-
-export interface Supplier {
-    id?: number;
-    name: string;
-    phone?: string;
-    address?: string;
-    note?: string;
-    debtToSupplier: number;
-    nextPaymentDate?: Date;
-    createdAt?: Date;
-}
-
-export interface InvoiceItem {
-  productId: number;
-  productName: string;
-  quantity: number;
-  price: number;
-  cost: number;
+  createdAt: string;
 }
 
 export interface Invoice {
-  id?: number;
-  customerId?: number;
-  customerName?: string;
-  date: Date;
-  total: number;
-  totalCost: number;
-  items: InvoiceItem[];
-  status: 'paid' | 'pending' | 'cancelled' | 'returned';
-  paymentMethod: 'cash' | 'card' | 'debt';
-  pointsEarned?: number;
-  pointsRedeemed?: number;
-  discountAmount?: number;
-  barcode?: string;
+  id: number;
+  type: 'sale' | 'purchase' | 'expense' | 'return' | 'debt_payment';
+  description: string;
+  amount: number;
+  netProfit?: number;
+  createdAt: string;
+  customerId: number | null;
+  relatedId: number | null; // e.g., order ID
 }
 
-export type TransactionType = 'sale' | 'expense' | 'loss' | 'debt_in' | 'debt_out' | 'return';
-
-export interface FinancialTransaction {
-    id?: number;
-    type: TransactionType;
-    date: Date;
-    amount: number;
-    description: string;
-    relatedCost?: number;
-    invoiceId?: number;
-    customerId?: number;
-    supplierId?: number;
-    productId?: number;
-    note?: string;
-}
-
-export interface StockMovement {
-    id?: number;
-    productId: number;
-    type: 'sale' | 'restock' | 'loss' | 'return' | 'edit' | 'initial';
-    quantity: number;
-    date: Date;
-    description?: string;
-    invoiceId?: number;
-}
-
-export interface AppNotification {
-    id?: number;
-    type: 'stock' | 'debt_customer' | 'debt_supplier' | 'system';
-    title: string;
-    message: string;
-    date: Date;
-    read: boolean;
-    link?: string;
-    referenceId?: number | string;
-}
-
-export interface CartItem extends InvoiceItem {
-  stockNow: number;
-}
-
-export interface StoreSettings {
-  id?: number;
+export interface Settings {
   storeName: string;
-  storeAddress?: string;
-  storePhone?: string;
+  storeAddress: string;
+  storePhone: string;
+  receiptFooter: string;
   currency: string;
-  language: 'ar' | 'en';
   themeColor: string;
   posShowImages: boolean;
   posShowStock: boolean;
@@ -122,8 +48,21 @@ export interface StoreSettings {
   spendPerPoint: number;
   pointValue: number;
   minPointsToRedeem: number;
-  lastNotificationCheck?: Date;
-  receiptFooter?: string;
-  liveSyncEnabled: boolean;
-  cloudApiUrl?: string;
+}
+
+// POS specific types from the original file, kept for consistency
+export interface CartItem {
+  productId: number;
+  productName: string;
+  quantity: number;
+  price: number;
+  cost: number;
+}
+
+export interface ActiveCart {
+  id: string;
+  label: string;
+  items: CartItem[];
+  customerId: number | null;
+  redeemPoints: boolean;
 }

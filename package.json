@@ -11,10 +11,7 @@
   "dependencies": {
     "react-dom": "^19.2.0",
     "lucide-react": "^0.553.0",
-    "dexie": "^4.2.1",
-    "dexie-react-hooks": "^4.2.0",
     "recharts": "^3.3.0",
-    "dexie-export-import": "^4.1.4",
     "react-router-dom": "^7.9.5",
     "react": "^19.2.0",
     "html-to-image": "1.11.11"
